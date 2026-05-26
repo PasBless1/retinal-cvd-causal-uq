@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+title: "Retinal CVD Risk: Causal Mediation Analysis with Uncertainty Quantification"
+message: "If you use this software, please cite it as below."
+authors:
+  - family-names: "Your"
+    given-names: "Name"
+version: 0.1.0
+date-released: 2026-05-18
+license: MIT

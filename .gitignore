@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.venv/
+outputs/
+data/
+*.pt
+*.npy
+.pytest_cache/
+.claude/
+noxon-joint-angle-pipeline/
+noxon-joint-angle-pipeline.zip
+noxon_joint_angle_estimation.ipynb
+*.egg-info/
+dist/
+build/
