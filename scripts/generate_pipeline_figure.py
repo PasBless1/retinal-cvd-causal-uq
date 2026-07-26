@@ -43,15 +43,15 @@ BOXES = [
 
     (8.75, 0.62, 1,
      'Stage 1   Bayesian Vessel Segmentation',
-     r'Mean-field Gaussian U-Net  $\cdot$  3 encoder-decoder levels'
+     r'CLAHE preprocessing  $\cdot$  DRIVE-pretrained Bayesian U-Net'
      r'  $\cdot$  $S=20$ MC passes',
      r'$\rightarrow$  Vessel mask  +  per-pixel epistemic uncertainty'
      r'  $\hat{\sigma}$'),
 
     (6.95, 0.62, 2,
      'Stage 2   Vascular Biomarker Extraction',
-     r'Medial-axis skeletonisation  $\cdot$  box-counting $D_f$'
-     r'  $\cdot$  arc-to-chord tortuosity $\kappa$',
+     r'DRIVE-calibrated threshold  $\cdot$  medial-axis skeletonisation'
+     r'  $\cdot$  box-counting $D_f$  $\cdot$  arc-to-chord $\kappa$',
      r'$\rightarrow$  10 features: $\rho,\;A,\;D_f,\;\kappa,\;B,\;W,'
      r'\;C,\;L,\;\beta,\;\hat{\sigma}$'),
 
@@ -69,7 +69,7 @@ BOXES = [
 
     (1.55, 0.38, 5,
      'Report',
-     r'CVD risk score  $\cdot$  causal pathways  $\cdot$  '
+     r'Retinal disease-risk classification  $\cdot$  causal pathways  $\cdot$  '
      r'coverage-guaranteed intervals',
      None),
 ]

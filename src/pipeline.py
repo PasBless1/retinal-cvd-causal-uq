@@ -65,7 +65,10 @@ def run(cfg: dict, synthetic: bool = False,
                     feat_df.reset_index(drop=True)], axis=1)
 
     # ---- Stage 2b: labels ---------------------------------------------
-    if cfg["labels"]["enabled"] and "cvd_risk" not in df.columns:
+    # Synthetic runs have no real disease columns to fall back on, so a
+    # synthetic outcome is required regardless of `labels.enabled` (which
+    # only governs whether to synthesize on top of real RFMiD data).
+    if (synthetic or cfg["labels"]["enabled"]) and "cvd_risk" not in df.columns:
         df = add_synthetic_cvd_risk(df, cfg)
     if save:
         df.to_csv(os.path.join(out_dir, "features_table.csv"), index=False)
@@ -100,7 +103,8 @@ def run(cfg: dict, synthetic: bool = False,
     X = df[feature_cols].to_numpy(dtype=float)
 
     reg = split_conformal_regression(X, df["cvd_risk"].to_numpy(float), cfg)
-    print(f"   regression: target coverage "
+    reg_tag = " (diagnostic only -- binary outcome, see classification)" if reg.is_binary_outcome else ""
+    print(f"   regression{reg_tag}: target coverage "
           f"{1 - reg.alpha:.0%}, empirical "
           f"{reg.empirical_coverage:.1%}, mean width {reg.mean_width:.2f}")
 
@@ -112,7 +116,10 @@ def run(cfg: dict, synthetic: bool = False,
                 X, df["cvd_label"].to_numpy(int), cfg)
             print(f"   classification: empirical coverage "
                   f"{clf.empirical_coverage:.1%}, mean set size "
-                  f"{clf.mean_set_size:.2f}")
+                  f"{clf.mean_set_size:.2f}, AUROC {clf.auroc:.3f}, "
+                  f"F1 {clf.f1:.3f}")
+            by_class = {k: round(v, 3) for k, v in clf.coverage_by_class.items()}
+            print(f"   classification: coverage by class {by_class}")
         else:
             print("   classification: skipped (insufficient class balance)")
 
@@ -130,13 +137,22 @@ def run(cfg: dict, synthetic: bool = False,
             "empirical_coverage": reg.empirical_coverage,
             "mean_interval_width": reg.mean_width,
             "quantile": reg.quantile,
+            "is_binary_outcome": reg.is_binary_outcome,
+            "clipped_to": reg.clipped_to,
+            "note": ("diagnostic only (binary outcome); see "
+                     "conformal_classification for the headline UQ result"
+                     if reg.is_binary_outcome else None),
         },
         "conformal_classification": (
             None if clf is None else {
                 "empirical_coverage": clf.empirical_coverage,
                 "mean_set_size": clf.mean_set_size,
+                "auroc": clf.auroc,
+                "f1": clf.f1,
+                "coverage_by_class": clf.coverage_by_class,
             }
         ),
+        "headline_uq": "classification" if (clf is not None and reg.is_binary_outcome) else "regression",
     }
     with open(os.path.join(out_dir, "summary.json"), "w") as fh:
         json.dump(summary, fh, indent=2)

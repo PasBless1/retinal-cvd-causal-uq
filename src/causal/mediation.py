@@ -12,7 +12,8 @@ with confounders C adjusted for in both models. We report:
     NDE (natural direct effect)   = c'
     NIE (natural indirect effect) = a * b
     Total effect                  = c' + a*b
-    Proportion mediated           = NIE / Total
+    Proportion mediated           = NIE / Total  (NaN when total is not
+                                    significantly non-zero by delta-method SE)
 
 Confidence intervals come from a nonparametric bootstrap, which avoids the
 fragile normality assumptions of the product-of-coefficients delta method.
@@ -25,12 +26,15 @@ quantities, it does not certify the assumptions.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from typing import Dict, List
 
 import numpy as np
 import pandas as pd
 import statsmodels.formula.api as smf
+
+from ..data.labels import add_noncircular_outcome
 
 
 @dataclass
@@ -40,17 +44,19 @@ class MediationResult:
     direct_effect: float
     indirect_effect: float
     total_effect: float
-    proportion_mediated: float
+    proportion_mediated: float   # NaN when total effect is not significant
     ci: Dict[str, tuple] = field(default_factory=dict)
 
     def summary(self) -> str:
         lo_n, hi_n = self.ci.get("indirect", (np.nan, np.nan))
+        pm = self.proportion_mediated
+        pm_str = f"{pm:5.1%}" if not math.isnan(pm) else "  n.s."
         return (
             f"{self.exposure:>22s} -> {self.mediator:<16s} | "
             f"NDE={self.direct_effect:+.4f}  "
             f"NIE={self.indirect_effect:+.4f} "
             f"[{lo_n:+.4f}, {hi_n:+.4f}]  "
-            f"prop_med={self.proportion_mediated:5.1%}"
+            f"prop_med={pm_str}"
         )
 
 
@@ -73,10 +79,21 @@ def _single_mediation(df: pd.DataFrame, x: str, m: str, y: str,
     a = med_model.params.get(x, 0.0)
     b = out_model.params.get(m, 0.0)
     c_prime = out_model.params.get(x, 0.0)
+    # Delta-method SEs for NIE (product rule) and total effect
+    se_a = float(med_model.bse.get(x, 0.0))
+    se_b = float(out_model.bse.get(m, 0.0))
+    se_c = float(out_model.bse.get(x, 0.0))
     nie = a * b
     nde = c_prime
     total = nie + nde
-    prop = nie / total if abs(total) > 1e-9 else 0.0
+    se_nie = float(np.sqrt((b * se_a) ** 2 + (a * se_b) ** 2))
+    se_total = float(np.sqrt(se_nie ** 2 + se_c ** 2))
+    # Proportion mediated is unreliable when the total effect is not
+    # significantly different from zero (|total| < 2*SE by delta method).
+    if abs(total) < 2.0 * se_total or abs(total) < 1e-9:
+        prop = float("nan")
+    else:
+        prop = float(np.clip(nie / total, 0.0, 1.0))
     return {"a": a, "b": b, "nde": nde, "nie": nie,
             "total": total, "prop": prop}
 
@@ -111,7 +128,8 @@ def run_mediation(df: pd.DataFrame, cfg: dict) -> List[MediationResult]:
                     bp = _single_mediation(bdf, x, m, y, confounders)
                     boot_nie.append(bp["nie"])
                     boot_nde.append(bp["nde"])
-                    boot_prop.append(bp["prop"])
+                    if not math.isnan(bp["prop"]):
+                        boot_prop.append(bp["prop"])
                 except Exception:
                     continue
 
@@ -137,6 +155,31 @@ def run_mediation(df: pd.DataFrame, cfg: dict) -> List[MediationResult]:
     return results
 
 
+def run_mediation_noncircular(df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
+    """
+    Robustness check for the mediator-circularity problem: for each
+    configured mediator, re-run mediation against a composite outcome with
+    THAT mediator's own condition excluded from the OR (see
+    data.labels.add_noncircular_outcome), so e.g. DR is tested as a
+    mediator of a disease-risk composite that does not itself contain DR
+    as one of its OR'd terms.
+
+    Excluding mediators one at a time (rather than all configured mediators
+    at once) avoids being over-conservative: excluding BRVO from the
+    outcome is not required to break DR's circularity, and vice versa.
+    """
+    frames = []
+    for m in cfg["causal"]["mediators"]:
+        out_col = f"Disease_Risk_ex_{m}"
+        df_m = add_noncircular_outcome(df, cfg, exclude=[m], out_col=out_col)
+        cfg_m = dict(cfg)
+        cfg_m["causal"] = dict(cfg["causal"])
+        cfg_m["causal"]["mediators"] = [m]
+        cfg_m["causal"]["outcome"] = out_col
+        frames.append(results_to_frame(run_mediation(df_m, cfg_m)))
+    return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+
+
 def results_to_frame(results: List[MediationResult]) -> pd.DataFrame:
     rows = []
     for r in results:
@@ -146,7 +189,7 @@ def results_to_frame(results: List[MediationResult]) -> pd.DataFrame:
             "direct_effect": r.direct_effect,
             "indirect_effect": r.indirect_effect,
             "total_effect": r.total_effect,
-            "proportion_mediated": r.proportion_mediated,
+            "proportion_mediated": r.proportion_mediated,  # NaN preserved
             "indirect_ci_low": r.ci["indirect"][0],
             "indirect_ci_high": r.ci["indirect"][1],
             "proportion_ci_low": r.ci["proportion"][0],

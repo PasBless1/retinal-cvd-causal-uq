@@ -43,7 +43,9 @@ def train_segmenter(model: torch.nn.Module, images_np: np.ndarray,
     """
     ckpt = cfg["segmentation"]["checkpoint"]
     if os.path.exists(ckpt):
+        device = "cuda" if torch.cuda.is_available() else "cpu"
         model.load_state_dict(torch.load(ckpt, map_location="cpu"))
+        model.to(device)
         model.eval()
         return model
 
@@ -81,15 +83,20 @@ def train_segmenter(model: torch.nn.Module, images_np: np.ndarray,
 
 def segment_with_uncertainty(model: torch.nn.Module,
                              images_np: np.ndarray,
-                             cfg: dict) -> Dict[str, np.ndarray]:
-    """Run MC inference, returning mean masks and uncertainty maps."""
+                             cfg: dict,
+                             batch_size: int = 8) -> Dict[str, np.ndarray]:
+    """Run batched MC inference, returning mean masks and uncertainty maps."""
     device = next(model.parameters()).device
     x = torch.tensor(images_np).permute(0, 3, 1, 2).float() / 255.0
     s = cfg["segmentation"]["mc_samples"]
+    n = x.shape[0]
     masks, uncs = [], []
     model.eval()
-    for i in range(x.shape[0]):
-        out = model(x[i:i + 1].to(device), mc_samples=s)
-        masks.append(out["mask"].squeeze().cpu().numpy())
-        uncs.append(out["uncertainty"].squeeze().cpu().numpy())
-    return {"masks": np.stack(masks), "uncertainty": np.stack(uncs)}
+    for start in range(0, n, batch_size):
+        batch = x[start:start + batch_size].to(device)
+        out = model(batch, mc_samples=s)
+        masks.append(out["mask"].squeeze(1).cpu().numpy())      # (B, H, W)
+        uncs.append(out["uncertainty"].squeeze(1).cpu().numpy())
+        if (start // batch_size) % 10 == 0:
+            print(f"  [{start + len(masks[-1])}/{n}]", flush=True)
+    return {"masks": np.concatenate(masks), "uncertainty": np.concatenate(uncs)}

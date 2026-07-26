@@ -8,6 +8,7 @@ clinical rationale.
 
 from __future__ import annotations
 
+import warnings
 from typing import Dict
 
 import numpy as np
@@ -89,6 +90,12 @@ def extract_biomarkers(prob_mask: np.ndarray,
     thr = cfg["features"]["vessel_threshold"]
     mask = (prob_mask > thr).astype(np.uint8)
     if mask.sum() == 0:
+        warnings.warn(
+            f"extract_biomarkers: empty vessel mask at threshold {thr} "
+            f"(prob_mask max={float(prob_mask.max()):.4f}); falling back "
+            f"to a single center pixel. This threshold may not be "
+            f"calibrated for this segmenter/dataset -- see "
+            f"src/models/calibration.py.", stacklevel=2)
         mask[mask.shape[0] // 2, mask.shape[1] // 2] = 1  # avoid empty
     skel = skeletonize(mask).astype(np.uint8)
     labeled, n_comp = ndimage.label(skel)

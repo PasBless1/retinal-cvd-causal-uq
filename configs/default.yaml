@@ -6,39 +6,63 @@
 seed: 42
 
 data:
-  # Root directory containing the extracted mBRSET dataset.
-  # Expected to contain an images directory and a metadata CSV.
-  root: data/mbrset
-  images_subdir: images
+  root: data/rfmid
+  images_subdir: .
   metadata_csv: metadata.csv
-  image_size: 512            # images are resized to image_size x image_size
-  # Column names in the mBRSET metadata CSV. Adjust to match the real file
-  # once downloaded (the loader will warn if a column is missing and fall
-  # back to sensible defaults).
+  image_size: 512
+  # Column names in the RFMiD CSV. Columns absent from RFMiD (age, sex, etc.)
+  # are warned about and imputed by the data loader.
   columns:
-    patient_id: patient_id
+    patient_id: ID
     age: age
     sex: sex
-    diabetes_time: dm_time          # years since diabetes diagnosis
-    insulin: insulin
-    systolic_bp: systolic_bp        # may be absent -> imputed
-    ldl: ldl_cholesterol            # may be absent -> imputed
+    diabetes_time: dm_duration
+    systolic_bp: systolic_bp
+    ldl_cholesterol: ldl_cholesterol
+  # Optional: RFMiD's official Training/Validation/Testing partitions (all
+  # downloaded together via kagglehub). When RetinalDataset is constructed
+  # with split="training"/"validation"/"testing", these override
+  # images_subdir/metadata_csv above so results can be reported on
+  # genuinely held-out data instead of only an internal re-split of the
+  # Training set. Paths are relative to `root`.
+  splits:
+    training:
+      images_dir: "1. Original Images/1. Original Images/a. Training Set"
+      metadata_csv: "2. Groundtruths/2. Groundtruths/a. RFMiD_Training_Labels.csv"
+    validation:
+      images_dir: "1. Original Images/1. Original Images/b. Validation Set"
+      metadata_csv: "2. Groundtruths/2. Groundtruths/b. RFMiD_Validation_Labels.csv"
+    testing:
+      images_dir: "1. Original Images/1. Original Images/c. Testing Set"
+      metadata_csv: "2. Groundtruths/2. Groundtruths/c. RFMiD_Testing_Labels.csv"
 
 segmentation:
   model: bayesian_unet       # one of: bayesian_unet | mc_dropout_unet
   base_channels: 32
   mc_samples: 20             # Monte Carlo forward passes at inference
   dropout_p: 0.3             # only used by mc_dropout_unet
-  epochs: 20                  # demo default; raise for real training
+  epochs: 20
   batch_size: 8
   lr: 0.001
-  # If a checkpoint exists it is loaded instead of training from scratch.
-  checkpoint: outputs/bayesian_unet.pt
+  # DRIVE-trained checkpoint. If it exists, training is skipped.
+  checkpoint: outputs/checkpoints/drive_unet.pt
 
 features:
-  # Threshold applied to the soft vessel probability map.
+  # Calibrated against DRIVE validation masks (see calibration section
+  # below and src/models/calibration.py) rather than hand-picked -- a
+  # fixed 0.5 is not safe to assume, since the segmenter's probability
+  # range on a given dataset is not guaranteed to reach that high.
   vessel_threshold: 0.5
   fractal_box_sizes: [2, 4, 8, 16, 32, 64]
+
+# Threshold calibration against DRIVE's real expert-annotated validation
+# masks (ids below match the val/train split used in the DRIVE training
+# notebook cell). Writes the result into features.vessel_threshold.
+calibration:
+  enabled: true
+  metric: dice        # dice | iou | f1 | sensitivity | specificity | auroc
+  n_grid: 50
+  drive_val_ids: [16, 17, 18, 19]
 
 causal:
   # Retinal features treated as exposures (X) in the mediation models.
@@ -49,8 +73,8 @@ causal:
     - vessel_width_mean
   # Clinical mediators (M) on the causal path X -> M -> Y.
   mediators:
-    - systolic_bp
-    - ldl_cholesterol
+    - DR
+    - BRVO
   # Confounders adjusted for in both mediator and outcome models.
   confounders:
     - age
@@ -62,14 +86,20 @@ causal:
 uncertainty:
   # Split-conformal miscoverage rate. alpha=0.1 -> 90% intervals.
   alpha: 0.1
-  calibration_fraction: 0.35   # larger cal set -> more stable quantile
+  calibration_fraction: 0.35
   test_fraction: 0.15
+  # Optional [low, high]: the outcome's true physical support, used to
+  # clip regression-conformal intervals (see split_conformal_regression).
+  # Only needed for a non-binary but still-bounded outcome (e.g. a 0-100
+  # risk score) -- a binary outcome is auto-detected and clipped to
+  # [0, 1] regardless of this key. Leave unset/absent for a genuinely
+  # unbounded continuous outcome.
+  # outcome_bounds: [0.0, 1.0]
 
 labels:
-  # Synthetic CVD risk label generation (used when no real outcome column
-  # is present). Coefficients loosely follow Framingham-style weighting.
-  enabled: true
-  binary_threshold: 20.0      # cvd_risk > threshold -> positive class
+  # Set to false to use real RFMiD Disease_Risk labels as outcome.
+  enabled: false
+  binary_threshold: 20.0
 
 output:
   dir: outputs
