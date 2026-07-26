@@ -7,11 +7,6 @@ condition (diabetic retinopathy or branch retinal vein occlusion) via causal med
 analysis, with coverage-guaranteed uncertainty intervals at every stage. RFMiD contains no
 cardiovascular endpoint, so no claim about cardiovascular disease is made or tested here.
 
-This repository accompanies the paper:
-
-> Blessing Asare and Mouzhi Ge. *Causal Mediation Analysis of Retinal Vascular Biomarkers
-> with Distribution-Free Uncertainty Quantification.*
-
 ---
 
 ## Why this matters
