@@ -1,13 +1,16 @@
-# Retinal CVD Risk: Causal Mediation Analysis with Uncertainty Quantification
+# Retinal Vascular Biomarkers: Causal Mediation Analysis with Distribution-Free Uncertainty Quantification
 
-A reproducible four-stage research pipeline that predicts cardiovascular disease (CVD) risk
-from retinal fundus images, explains *how* vascular features drive that risk through causal
-mediation analysis, and provides coverage-guaranteed uncertainty intervals at every prediction.
+A reproducible four-stage research pipeline — a methodological proof of concept, not a
+clinical prediction system — that extracts vascular biomarkers from retinal fundus images and
+tests whether they act on retinal disease risk directly or through an intermediate retinal
+condition (diabetic retinopathy or branch retinal vein occlusion) via causal mediation
+analysis, with coverage-guaranteed uncertainty intervals at every stage. RFMiD contains no
+cardiovascular endpoint, so no claim about cardiovascular disease is made or tested here.
 
 This repository accompanies the paper:
 
-> *Causal Mediation Analysis of Retinal Vascular Features and Cardiovascular Risk with
-> Uncertainty Quantification: A Bayesian Conformal Prediction Framework.*
+> Blessing Asare and Mouzhi Ge. *Causal Mediation Analysis of Retinal Vascular Biomarkers
+> with Distribution-Free Uncertainty Quantification.*
 
 ---
 
@@ -182,27 +185,12 @@ retinal-cvd-causal-uq/
 
 ---
 
-## Citation
-
-```bibtex
-@article{asare2025retinalcvd,
-  author  = {Asare, Blessing},
-  title   = {Causal Mediation Analysis of Retinal Vascular Features and
-             Cardiovascular Risk with Uncertainty Quantification:
-             A Bayesian Conformal Prediction Framework},
-  year    = {2025}
-}
-```
-
-See also `CITATION.cff`.
-
----
-
 ## Contributors
 
 | Name | Email | Role |
 |------|-------|------|
 | Blessing Asare | asareblessing8@gmail.com | Author and maintainer |
+| Mouzhi Ge | mouzhige@th-deg.de | Author |
 
 ---
 
