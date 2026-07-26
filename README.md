@@ -185,15 +185,6 @@ retinal-cvd-causal-uq/
 
 ---
 
-## Contributors
-
-| Name | Email | Role |
-|------|-------|------|
-| Blessing Asare | asareblessing8@gmail.com | Author and maintainer |
-| Mouzhi Ge | mouzhige@th-deg.de | Author |
-
----
-
 ## License
 
 MIT License (code). The RFMiD dataset is licensed separately under CC-BY 4.0 —
